@@ -8,8 +8,13 @@ back automatically after this script runs. No cloud auth needed.
 
 import sys
 import datetime
+from datetime import timezone, timedelta
 import requests
 import openpyxl
+
+SGT = timezone(timedelta(hours=8))  # GitHub Actions runs in UTC; the job fires at
+                                     # 16:00 UTC, which is already midnight the NEXT
+                                     # day in Singapore — must compute "today" in SGT.
 
 FILE_PATH = "SGDUSD_Tracker.xlsx"  # <-- update this if your filename differs
 SHEET_NAME = "new"
@@ -31,7 +36,7 @@ def fetch_rates():
 
 
 def find_row_for_today(ws):
-    today = datetime.date.today()
+    today = datetime.datetime.now(SGT).date()
     last_filled_row = 1
     for row in range(2, ws.max_row + 1):
         cell_value = ws.cell(row=row, column=DATE_COL_IDX).value
