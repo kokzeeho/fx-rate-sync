@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.heritage.fxpull</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/YOUR_USERNAME/pull_fx_repo.sh</string>
+    </array>
+
+    <!-- Runs at 00:10 local time daily, giving the GitHub Actions job
+         (which runs at midnight GMT+8) 10 minutes to finish and commit -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>10</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USERNAME/fx-pull-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USERNAME/fx-pull-launchd.log</string>
+
+    <!-- Catches up on the pull if your Mac was asleep at 00:10 -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
