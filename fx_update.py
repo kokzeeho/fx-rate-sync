@@ -8,13 +8,8 @@ back automatically after this script runs. No cloud auth needed.
 
 import sys
 import datetime
-from datetime import timezone, timedelta
 import requests
 import openpyxl
-
-SGT = timezone(timedelta(hours=8))  # GitHub Actions runs in UTC; the job fires at
-                                     # 16:00 UTC, which is already midnight the NEXT
-                                     # day in Singapore — must compute "today" in SGT.
 
 FILE_PATH = "SGDUSD_Tracker.xlsx"  # <-- update this if your filename differs
 SHEET_NAME = "new"
@@ -23,20 +18,24 @@ RATE_COL_IDXS = [2, 3, 4]  # Columns B, C, D = SGD/USD, SGD/EUR, USD/RMB
 
 
 def fetch_rates():
-    """Fetch SGD/USD, SGD/EUR, USD/RMB from Frankfurter (ECB rates, no API key)."""
+    """Fetch SGD/USD, SGD/EUR, USD/RMB from Frankfurter (ECB rates, no API key).
+    Returns (rates_list, rate_date) — rate_date is the date the rates were
+    actually published for (from the API itself), not today's clock date.
+    """
     r1 = requests.get("https://api.frankfurter.dev/v1/latest", params={"base": "SGD", "symbols": "USD,EUR"})
     r1.raise_for_status()
-    d1 = r1.json()["rates"]
+    j1 = r1.json()
+    d1 = j1["rates"]
 
     r2 = requests.get("https://api.frankfurter.dev/v1/latest", params={"base": "USD", "symbols": "CNY"})
     r2.raise_for_status()
     d2 = r2.json()["rates"]
 
-    return [d1["USD"], d1["EUR"], d2["CNY"]]
+    rate_date = datetime.date.fromisoformat(j1["date"])  # e.g. "2026-09-09"
+    return [d1["USD"], d1["EUR"], d2["CNY"]], rate_date
 
 
-def find_row_for_today(ws):
-    today = datetime.datetime.now(SGT).date()
+def find_row_for_date(ws, target_date):
     last_filled_row = 1
     for row in range(2, ws.max_row + 1):
         cell_value = ws.cell(row=row, column=DATE_COL_IDX).value
@@ -44,25 +43,25 @@ def find_row_for_today(ws):
             continue
         last_filled_row = row
         cell_date = cell_value.date() if isinstance(cell_value, datetime.datetime) else cell_value
-        if cell_date == today:
+        if cell_date == target_date:
             return row
-    # Today's date wasn't pre-filled — append after the last filled row.
+    # Target date wasn't pre-filled — append after the last filled row.
     new_row = last_filled_row + 1
-    ws.cell(row=new_row, column=DATE_COL_IDX, value=datetime.datetime.combine(today, datetime.time()))
+    ws.cell(row=new_row, column=DATE_COL_IDX, value=datetime.datetime.combine(target_date, datetime.time()))
     return new_row
 
 
 def main():
     print("Fetching rates...")
-    rates = fetch_rates()
-    print(f"Rates (SGD/USD, SGD/EUR, USD/RMB): {rates}")
+    rates, rate_date = fetch_rates()
+    print(f"Rates for {rate_date} (SGD/USD, SGD/EUR, USD/RMB): {rates}")
 
     print(f"Opening {FILE_PATH}...")
     wb = openpyxl.load_workbook(FILE_PATH)
     ws = wb[SHEET_NAME]
 
-    row = find_row_for_today(ws)
-    print(f"Writing to row {row}...")
+    row = find_row_for_date(ws, rate_date)
+    print(f"Writing to row {row} (date {rate_date})...")
     for col_idx, value in zip(RATE_COL_IDXS, rates):
         ws.cell(row=row, column=col_idx, value=value)
 
