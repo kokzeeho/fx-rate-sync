@@ -12,6 +12,7 @@ Conventions (confirmed against the tracker's historical data):
 """
 
 import sys
+import copy
 import datetime
 import requests
 import openpyxl
@@ -21,8 +22,6 @@ FILE_PATH = "SGDUSD_Tracker.xlsx"  # <-- update this if your filename differs
 SHEET_NAME = "new"
 DATE_COL_IDX = 1   # Column A
 RATE_COL_IDXS = [2, 3, 4]  # Columns B, C, D = SGD/USD, SGD/EUR, USD/RMB
-DATE_NUMBER_FORMAT = "d/m/yyyy"
-RATE_NUMBER_FORMAT = "0.0000"
 
 
 def fetch_rates():
@@ -80,6 +79,26 @@ def scroll_to_row(ws, row):
     ws.sheet_view.topLeftCell = f"A{max(row - 15, 1)}"
 
 
+TEMPLATE_ROW = 2  # earliest data row — used as a style fallback when the row
+                   # directly above the new entry is unformatted (e.g. the
+                   # USD/RMB column has been blank for a long historical stretch)
+
+
+def copy_style(source_cell, target_cell, fallback_cell=None):
+    """Copies font, alignment, number format, border, and fill from one cell
+    to another. If the source cell looks unformatted (number_format is the
+    Excel default 'General'), uses fallback_cell instead."""
+    style_source = source_cell
+    if fallback_cell is not None and source_cell.number_format == "General":
+        style_source = fallback_cell
+
+    target_cell.font = copy.copy(style_source.font)
+    target_cell.alignment = copy.copy(style_source.alignment)
+    target_cell.number_format = style_source.number_format
+    target_cell.border = copy.copy(style_source.border)
+    target_cell.fill = copy.copy(style_source.fill)
+
+
 def main():
     print("Fetching rates...")
     rates, rate_date = fetch_rates()
@@ -95,12 +114,12 @@ def main():
 
     if not found_existing:
         date_cell = ws.cell(row=row, column=DATE_COL_IDX, value=datetime.datetime.combine(rate_date, datetime.time()))
-        date_cell.number_format = DATE_NUMBER_FORMAT
+        copy_style(ws.cell(row=row - 1, column=DATE_COL_IDX), date_cell, ws.cell(row=TEMPLATE_ROW, column=DATE_COL_IDX))
 
     print(f"Writing rates to row {row}...")
     for col_idx, value in zip(RATE_COL_IDXS, rates):
         cell = ws.cell(row=row, column=col_idx, value=value)
-        cell.number_format = RATE_NUMBER_FORMAT
+        copy_style(ws.cell(row=row - 1, column=col_idx), cell, ws.cell(row=TEMPLATE_ROW, column=col_idx))
 
     scroll_to_row(ws, row)
 
