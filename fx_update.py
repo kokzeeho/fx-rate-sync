@@ -112,9 +112,9 @@ def main():
     wb = openpyxl.load_workbook(FILE_PATH)  # data_only=False (default) — keeps formulas intact
     ws = wb[SHEET_NAME]
 
-    if not found_existing:
-        date_cell = ws.cell(row=row, column=DATE_COL_IDX, value=datetime.datetime.combine(rate_date, datetime.time()))
-        copy_style(ws.cell(row=row - 1, column=DATE_COL_IDX), date_cell, ws.cell(row=TEMPLATE_ROW, column=DATE_COL_IDX))
+    date_cell = ws.cell(row=row, column=DATE_COL_IDX, value=datetime.datetime.combine(rate_date, datetime.time()))
+    style_source_row = row - 1 if row > 2 else TEMPLATE_ROW
+    copy_style(ws.cell(row=style_source_row, column=DATE_COL_IDX), date_cell, ws.cell(row=TEMPLATE_ROW, column=DATE_COL_IDX))
 
     print(f"Writing rates to row {row}...")
     for col_idx, value in zip(RATE_COL_IDXS, rates):
