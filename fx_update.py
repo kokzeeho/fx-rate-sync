@@ -1,14 +1,16 @@
 """
 Daily FX rate updater — GitHub repo version.
 
-Fetches SGD/USD, SGD/EUR, USD/RMB and appends them as a new row at the bottom
-of the xlsx file, which lives in this same repo. GitHub Actions commits the
-change back automatically after this script runs. No cloud auth needed.
+Fetches SGD/USD, SGD/EUR, USD/RMB, SGD/GBP and appends them as a new row at
+the bottom of the xlsx file, which lives in this same repo. GitHub Actions
+commits the change back automatically after this script runs. No cloud auth
+needed.
 
 Conventions (confirmed against the tracker's historical data):
   - SGD/USD column = amount of SGD for 1 USD  (e.g. ~1.27)
   - SGD/EUR column = amount of SGD for 1 EUR  (e.g. ~1.47)
   - USD/RMB column = amount of RMB for 1 USD  (e.g. ~7.1)
+  - SGD/GBP column = amount of SGD for 1 GBP  (e.g. ~1.70)
 """
 
 import sys
@@ -21,15 +23,17 @@ from openpyxl.worksheet.views import Selection
 FILE_PATH = "SGDUSD_Tracker.xlsx"  # <-- update this if your filename differs
 SHEET_NAME = "new"
 DATE_COL_IDX = 1   # Column A
-RATE_COL_IDXS = [2, 3, 4]  # Columns B, C, D = SGD/USD, SGD/EUR, USD/RMB
+RATE_COL_IDXS = [2, 3, 4, 6]  # Columns B, C, D, F = SGD/USD, SGD/EUR, USD/RMB, SGD/GBP
+# Column E (5) is intentionally skipped — it holds its own formula, not a fetched rate.
 
 
 def fetch_rates():
-    """Fetch SGD/USD, SGD/EUR, USD/RMB from Frankfurter (ECB rates, no API key).
+    """Fetch SGD/USD, SGD/EUR, USD/RMB, SGD/GBP from Frankfurter (ECB rates,
+    no API key).
 
-    Uses base=USD and base=EUR (rather than base=SGD) so the returned rates
-    are already in "amount of X for 1 USD/EUR" form, matching this tracker's
-    column convention directly — no inverting needed.
+    Uses base=USD, base=EUR, base=GBP (rather than base=SGD) so the returned
+    rates are already in "amount of X for 1 USD/EUR/GBP" form, matching this
+    tracker's column convention directly — no inverting needed.
 
     Returns (rates_list, rate_date) — rate_date is the date the rates were
     actually published for (from the API itself), not today's clock date.
@@ -43,13 +47,18 @@ def fetch_rates():
     r2.raise_for_status()
     d2 = r2.json()["rates"]
 
+    r3 = requests.get("https://api.frankfurter.dev/v1/latest", params={"base": "GBP", "symbols": "SGD"})
+    r3.raise_for_status()
+    d3 = r3.json()["rates"]
+
     rate_date = datetime.date.fromisoformat(j1["date"])  # e.g. "2026-09-09"
 
     sgd_per_usd = d1["SGD"]
     rmb_per_usd = d1["CNY"]
     sgd_per_eur = d2["SGD"]
+    sgd_per_gbp = d3["SGD"]
 
-    return [sgd_per_usd, sgd_per_eur, rmb_per_usd], rate_date
+    return [sgd_per_usd, sgd_per_eur, rmb_per_usd, sgd_per_gbp], rate_date
 
 
 def find_row_for_date(file_path, sheet_name, target_date):
@@ -102,7 +111,7 @@ def copy_style(source_cell, target_cell, fallback_cell=None):
 def main():
     print("Fetching rates...")
     rates, rate_date = fetch_rates()
-    print(f"Rates for {rate_date} (SGD/USD, SGD/EUR, USD/RMB): {rates}")
+    print(f"Rates for {rate_date} (SGD/USD, SGD/EUR, USD/RMB, SGD/GBP): {rates}")
 
     print("Finding matching row (using cached computed dates)...")
     row, found_existing = find_row_for_date(FILE_PATH, SHEET_NAME, rate_date)
