@@ -2,8 +2,8 @@ name: Daily FX Rate Update
 
 on:
   schedule:
-    # Midnight GMT+8 = 16:00 UTC the previous day
-    - cron: "0 16 * * *"
+    # 23:00 GMT+8 (SGT) = 15:00 UTC same day
+    - cron: "0 15 * * *"
   workflow_dispatch: {}  # allows manual trigger from the Actions tab for testing
 
 permissions:
