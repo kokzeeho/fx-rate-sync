@@ -14,6 +14,18 @@ Conventions (confirmed against the tracker's historical data):
   - SGD/GBP column = amount of SGD for 1 GBP  (e.g. ~1.70)
   - Column E = a formula referencing column D, not a fetched value; copied
     down (not recalculated) for each new row.
+
+Row dating (fixed 2026-09-13):
+  The row written each day is dated using the ACTUAL SINGAPORE CALENDAR DAY
+  the job runs for — not whatever date Frankfurter's API happens to stamp on
+  its own "latest" rate. Frankfurter's rate-date reflects the ECB's own
+  business-day cycle, and because this job is scheduled around midnight SGT
+  (= still the previous calendar day in UTC, which is what the API and the
+  runner's clock use), using the API's date directly made every single row
+  permanently land one calendar day behind true SGT "today". Singapore's
+  date is now computed independently via zoneinfo, and that is what gets
+  written to column A — the API is only used as a rate SOURCE, never as the
+  row's date.
 """
 
 import sys
@@ -23,12 +35,14 @@ import re
 import requests
 import openpyxl
 from openpyxl.worksheet.views import Selection
+from zoneinfo import ZoneInfo
 
 FILE_PATH = "SGDUSD_Tracker.xlsx"
 SHEET_NAME = "new"
 DATE_COL_IDX = 1
 RATE_COL_IDXS = [2, 3, 4, 6]  # B, C, D, F = SGD/USD, SGD/EUR, USD/RMB, SGD/GBP
 FORMULA_COL_IDX = 5  # E — copied down as a formula, not a fetched value
+SGT = ZoneInfo("Asia/Singapore")
 
 
 def fetch_rates():
@@ -45,14 +59,14 @@ def fetch_rates():
     r3.raise_for_status()
     d3 = r3.json()["rates"]
 
-    rate_date = datetime.date.fromisoformat(j1["date"])
+    api_rate_date = datetime.date.fromisoformat(j1["date"])
 
     sgd_per_usd = d1["SGD"]
     rmb_per_usd = d1["CNY"]
     sgd_per_eur = d2["SGD"]
     sgd_per_gbp = d3["SGD"]
 
-    return [sgd_per_usd, sgd_per_eur, rmb_per_usd, sgd_per_gbp], rate_date
+    return [sgd_per_usd, sgd_per_eur, rmb_per_usd, sgd_per_gbp], api_rate_date
 
 
 def find_row_for_date(file_path, sheet_name, target_date):
@@ -107,18 +121,19 @@ def copy_formula_down(ws, row, col_idx):
 
 def main():
     print("Fetching rates...")
-    rates, rate_date = fetch_rates()
-    print(f"Rates for {rate_date} (SGD/USD, SGD/EUR, USD/RMB, SGD/GBP): {rates}")
+    rates, api_rate_date = fetch_rates()
+    target_date = datetime.datetime.now(SGT).date()
+    print(f"Rates sourced from Frankfurter (API date {api_rate_date}); writing under SGT date {target_date}")
 
     print("Finding matching row (using cached computed dates)...")
-    row, found_existing = find_row_for_date(FILE_PATH, SHEET_NAME, rate_date)
+    row, found_existing = find_row_for_date(FILE_PATH, SHEET_NAME, target_date)
     print(f"Target row: {row} (pre-filled: {found_existing})")
 
     print(f"Opening {FILE_PATH} to write (preserving formulas)...")
     wb = openpyxl.load_workbook(FILE_PATH)
     ws = wb[SHEET_NAME]
 
-    date_cell = ws.cell(row=row, column=DATE_COL_IDX, value=datetime.datetime.combine(rate_date, datetime.time()))
+    date_cell = ws.cell(row=row, column=DATE_COL_IDX, value=datetime.datetime.combine(target_date, datetime.time()))
     style_source_row = row - 1 if row > 2 else TEMPLATE_ROW
     copy_style(ws.cell(row=style_source_row, column=DATE_COL_IDX), date_cell, ws.cell(row=TEMPLATE_ROW, column=DATE_COL_IDX))
 

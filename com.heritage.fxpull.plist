@@ -8,26 +8,24 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/YOUR_USERNAME/pull_fx_repo.sh</string>
+        <string>/Users/KokZee/FX Rate Sync - Do not delete/scripts/pull_fx_repo.sh</string>
     </array>
 
-    <!-- Runs at 00:10 local time daily, giving the GitHub Actions job
-         (which runs at midnight GMT+8) 10 minutes to finish and commit -->
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>0</integer>
-        <key>Minute</key>
-        <integer>10</integer>
-    </dict>
+    <!-- Runs every time you log in or your Mac wakes, AND every 30 minutes
+         while it's awake. The wake/login trigger alone missed updates when a
+         transient network hiccup happened right at wake time (as happened on
+         13 Sep) — the 30-minute interval means a failed attempt quietly
+         retries itself within half an hour instead of waiting for the next
+         login or wake. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StartInterval</key>
+    <integer>1800</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/YOUR_USERNAME/fx-pull-launchd.log</string>
+    <string>/Users/KokZee/FX Rate Sync - Do not delete/scripts/fx-pull-launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/YOUR_USERNAME/fx-pull-launchd.log</string>
-
-    <!-- Catches up on the pull if your Mac was asleep at 00:10 -->
-    <key>RunAtLoad</key>
-    <false/>
+    <string>/Users/KokZee/FX Rate Sync - Do not delete/scripts/fx-pull-launchd.log</string>
 </dict>
 </plist>
