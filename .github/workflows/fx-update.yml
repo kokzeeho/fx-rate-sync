@@ -27,10 +27,13 @@ jobs:
       - name: Run FX update
         run: python fx_update.py
 
-      - name: Commit updated file
+      - name: Export public data for FX Watch dashboard (GitHub Pages)
+        run: python export_public_json.py
+
+      - name: Commit updated files
         run: |
           git config user.name "fx-rate-bot"
           git config user.email "fx-rate-bot@users.noreply.github.com"
-          git add SGDUSD_Tracker.xlsx
+          git add SGDUSD_Tracker.xlsx docs/fx-public.json
           git diff --quiet --cached || git commit -m "Daily FX rate update $(TZ=Asia/Singapore date +'%Y-%m-%d')"
           git push
