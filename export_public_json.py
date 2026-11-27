@@ -1,16 +1,18 @@
 """
 Export FX Watch public data - GitHub repo version.
 
-Reads SGDUSD_Tracker.xlsx (sheet "new") and writes docs/fx-public.json: a
-plain JSON object with five series ("usd","eur","gbp","rmb","rebate"), each
-a list of [iso_date, value] pairs, built fresh from the xlsx every run.
+Reads SGDUSD_Tracker.xlsx (sheet "new") and writes:
+  - docs/fx-public.json: full history, five series ("usd","eur","gbp","rmb",
+    "rebate"), each a list of [iso_date, value] pairs.
+  - docs/fx-recent.json: same five series, but only the last N points each
+    (small file, safe for fetch tools that truncate large responses) - used
+    by the daily FX Watch dashboard refresh to catch up after any gap.
 
-This file is served publicly via GitHub Pages (Settings > Pages > Deploy
-from branch > main > /docs), so the private repo itself stays private while
-this one small derived file is readable with no auth. The FX Watch Claude
-artifact dashboard fetches this file directly, giving it exact parity with
-the authoritative xlsx (same source, same values), with no dependency on
-anyone's computer.
+Both are served publicly via GitHub Pages (this repo is public; Pages
+serves from main branch, /docs folder), so the FX Watch Claude artifact
+dashboard can read them directly with no auth and no dependency on anyone's
+computer - and since they're built straight from the same xlsx, the
+dashboard gets exact parity with the authoritative Excel file.
 
 Conventions (must match fx_update.py / the dashboard exactly):
   - "usd"    = SGD per 1 USD   (column B)
@@ -51,6 +53,16 @@ def resolve_date(row, raw_value):
     return None
 
 
+def write_recent(data, n=35):
+    """Small 'recent window' file (last n points per series) for fetch tools
+    that truncate very large responses; fx-public.json keeps the full
+    history for completeness/manual use."""
+    recent = {k: v[-n:] for k, v in data.items()}
+    with open("docs/fx-recent.json", "w") as out:
+        json.dump(recent, out, separators=(",", ":"))
+    print(f"Wrote docs/fx-recent.json: last {n} points per series")
+
+
 def main():
     wb = openpyxl.load_workbook(FILE_PATH, data_only=True)
     ws = wb[SHEET_NAME]
@@ -87,6 +99,8 @@ def main():
         json.dump(data, out, separators=(",", ":"))
 
     print(f"Wrote {OUT_PATH}: usd={len(usd)} eur={len(eur)} gbp={len(gbp)} rmb={len(rmb)} rebate={len(rebate)}")
+
+    write_recent(data)
 
 
 if __name__ == "__main__":
